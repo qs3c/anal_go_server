@@ -1,0 +1,21 @@
+CREATE TABLE analysis_jobs (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    analysis_id BIGINT NOT NULL COMMENT '分析ID',
+    user_id BIGINT NOT NULL COMMENT '用户ID',
+    repo_url VARCHAR(500) NOT NULL,
+    start_struct VARCHAR(100) NOT NULL,
+    depth INT NOT NULL,
+    model_name VARCHAR(50) NOT NULL,
+    status ENUM('queued', 'processing', 'completed', 'failed', 'cancelled') DEFAULT 'queued',
+    current_step VARCHAR(200) COMMENT '当前步骤',
+    error_message TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    started_at DATETIME COMMENT '开始处理时间',
+    completed_at DATETIME COMMENT '完成时间',
+    elapsed_seconds INT COMMENT '耗时秒数',
+    FOREIGN KEY (analysis_id) REFERENCES analyses(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_status (status),
+    INDEX idx_user_id (user_id),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='分析任务队列表';
