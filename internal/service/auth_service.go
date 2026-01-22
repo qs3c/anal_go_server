@@ -1,9 +1,11 @@
 package service
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -13,6 +15,7 @@ import (
 	"github.com/qs3c/anal_go_server/internal/model"
 	"github.com/qs3c/anal_go_server/internal/model/dto"
 	"github.com/qs3c/anal_go_server/internal/pkg/jwt"
+	"github.com/qs3c/anal_go_server/internal/pkg/oauth"
 	"github.com/qs3c/anal_go_server/internal/repository"
 )
 
@@ -26,14 +29,20 @@ var (
 )
 
 type AuthService struct {
-	userRepo *repository.UserRepository
-	cfg      *config.Config
+	userRepo    *repository.UserRepository
+	cfg         *config.Config
+	githubOAuth *oauth.GithubOAuth
 }
 
 func NewAuthService(userRepo *repository.UserRepository, cfg *config.Config) *AuthService {
 	return &AuthService{
 		userRepo: userRepo,
 		cfg:      cfg,
+		githubOAuth: oauth.NewGithubOAuth(
+			cfg.OAuth.Github.ClientID,
+			cfg.OAuth.Github.ClientSecret,
+			cfg.OAuth.Github.RedirectURI,
+		),
 	}
 }
 
@@ -193,4 +202,72 @@ func generateRandomCode(length int) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(bytes), nil
+}
+
+// GetGithubAuthURL 获取 GitHub 授权 URL
+func (s *AuthService) GetGithubAuthURL(state string) string {
+	return s.githubOAuth.GetAuthURL(state)
+}
+
+// GithubCallback 处理 GitHub OAuth 回调
+func (s *AuthService) GithubCallback(ctx context.Context, code string) (*dto.LoginResponse, error) {
+	// 用 code 换取 token
+	token, err := s.githubOAuth.Exchange(ctx, code)
+	if err != nil {
+		return nil, fmt.Errorf("failed to exchange code: %w", err)
+	}
+
+	// 获取 GitHub 用户信息
+	githubUser, err := s.githubOAuth.GetUser(ctx, token)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get github user: %w", err)
+	}
+
+	githubIDStr := fmt.Sprintf("%d", githubUser.ID)
+
+	// 检查用户是否已存在
+	user, err := s.userRepo.GetByGithubID(githubIDStr)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	if user == nil {
+		// 创建新用户
+		resetAt := time.Now().Add(24 * time.Hour).Truncate(24 * time.Hour)
+		user = &model.User{
+			Username:          githubUser.Login,
+			GithubID:          &githubIDStr,
+			AvatarURL:         githubUser.AvatarURL,
+			SubscriptionLevel: "free",
+			DailyQuota:        s.cfg.Subscription.Levels["free"].DailyQuota,
+			QuotaResetAt:      &resetAt,
+			EmailVerified:     true, // OAuth 用户默认已验证
+		}
+
+		// 如果有邮箱，设置邮箱
+		if githubUser.Email != "" {
+			user.Email = &githubUser.Email
+		}
+
+		// 确保用户名唯一
+		exists, _ := s.userRepo.ExistsByUsername(user.Username)
+		if exists {
+			user.Username = fmt.Sprintf("%s_%d", githubUser.Login, githubUser.ID)
+		}
+
+		if err := s.userRepo.Create(user); err != nil {
+			return nil, fmt.Errorf("failed to create user: %w", err)
+		}
+	}
+
+	// 生成 JWT Token
+	jwtToken, err := jwt.GenerateToken(user.ID, s.cfg.JWT.Secret, s.cfg.JWT.ExpireHours)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dto.LoginResponse{
+		Token: jwtToken,
+		User:  s.buildUserInfo(user),
+	}, nil
 }

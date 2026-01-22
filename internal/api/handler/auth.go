@@ -2,6 +2,8 @@ package handler
 
 import (
 	"errors"
+	"fmt"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 
@@ -91,4 +93,39 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 	}
 
 	response.SuccessWithMessage(c, "邮箱验证成功", resp)
+}
+
+// GithubAuth GitHub OAuth 登录
+// GET /api/v1/auth/github
+func (h *AuthHandler) GithubAuth(c *gin.Context) {
+	state := c.Query("state")
+	if state == "" {
+		state = "random_state" // 生产环境应该使用随机值并存储验证
+	}
+	authURL := h.authService.GetGithubAuthURL(state)
+	c.Redirect(http.StatusTemporaryRedirect, authURL)
+}
+
+// GithubCallback GitHub OAuth 回调
+// GET /api/v1/auth/github/callback
+func (h *AuthHandler) GithubCallback(c *gin.Context) {
+	code := c.Query("code")
+	if code == "" {
+		response.ParamError(c, "missing code parameter")
+		return
+	}
+
+	resp, err := h.authService.GithubCallback(c.Request.Context(), code)
+	if err != nil {
+		response.ServerError(c, "GitHub 登录失败")
+		return
+	}
+
+	// 重定向到前端，携带 token
+	frontendURL := c.Query("redirect_uri")
+	if frontendURL == "" {
+		frontendURL = "http://localhost:3000"
+	}
+	redirectURL := fmt.Sprintf("%s/auth/callback?token=%s", frontendURL, resp.Token)
+	c.Redirect(http.StatusTemporaryRedirect, redirectURL)
 }
