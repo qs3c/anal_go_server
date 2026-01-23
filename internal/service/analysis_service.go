@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/qs3c/anal_go_server/config"
 	"github.com/qs3c/anal_go_server/internal/model"
 	"github.com/qs3c/anal_go_server/internal/model/dto"
+	"github.com/qs3c/anal_go_server/internal/pkg/oss"
 	"github.com/qs3c/anal_go_server/internal/repository"
 )
 
@@ -23,6 +25,7 @@ type AnalysisService struct {
 	jobRepo      *repository.JobRepository
 	userRepo     *repository.UserRepository
 	quotaService *QuotaService
+	ossClient    *oss.Client
 	cfg          *config.Config
 }
 
@@ -31,6 +34,7 @@ func NewAnalysisService(
 	jobRepo *repository.JobRepository,
 	userRepo *repository.UserRepository,
 	quotaService *QuotaService,
+	ossClient *oss.Client,
 	cfg *config.Config,
 ) *AnalysisService {
 	return &AnalysisService{
@@ -38,6 +42,7 @@ func NewAnalysisService(
 		jobRepo:      jobRepo,
 		userRepo:     userRepo,
 		quotaService: quotaService,
+		ossClient:    ossClient,
 		cfg:          cfg,
 	}
 }
@@ -82,7 +87,30 @@ func (s *AnalysisService) Create(userID int64, req *dto.CreateAnalysisRequest) (
 		// 手动创建
 		analysis.Status = "draft"
 		if req.DiagramData != nil {
-			// TODO: 上传到 OSS
+			// 序列化并上传到 OSS
+			data, err := json.Marshal(req.DiagramData)
+			if err != nil {
+				return nil, err
+			}
+			if s.ossClient != nil {
+				// 先创建分析获取 ID
+				if err := s.analysisRepo.Create(analysis); err != nil {
+					return nil, err
+				}
+				ossURL, err := s.ossClient.UploadDiagram(analysis.ID, data)
+				if err != nil {
+					return nil, err
+				}
+				analysis.DiagramOSSURL = ossURL
+				analysis.DiagramSize = len(data)
+				analysis.Status = "completed"
+				now := time.Now()
+				analysis.CompletedAt = &now
+				if err := s.analysisRepo.Update(analysis); err != nil {
+					return nil, err
+				}
+				return &dto.CreateAnalysisResponse{AnalysisID: analysis.ID}, nil
+			}
 			analysis.Status = "completed"
 		}
 	}
@@ -194,7 +222,24 @@ func (s *AnalysisService) Update(userID, analysisID int64, req *dto.UpdateAnalys
 		analysis.Description = *req.Description
 	}
 	if req.DiagramData != nil {
-		// TODO: 上传到 OSS
+		// 序列化并上传到 OSS
+		data, err := json.Marshal(req.DiagramData)
+		if err != nil {
+			return nil, err
+		}
+		if s.ossClient != nil {
+			ossURL, err := s.ossClient.UploadDiagram(analysis.ID, data)
+			if err != nil {
+				return nil, err
+			}
+			analysis.DiagramOSSURL = ossURL
+			analysis.DiagramSize = len(data)
+			if analysis.Status == "draft" {
+				analysis.Status = "completed"
+				now := time.Now()
+				analysis.CompletedAt = &now
+			}
+		}
 	}
 
 	if err := s.analysisRepo.Update(analysis); err != nil {
@@ -221,7 +266,11 @@ func (s *AnalysisService) Delete(userID, analysisID int64) error {
 	// 取消进行中的任务
 	s.jobRepo.CancelByAnalysisID(analysisID)
 
-	// TODO: 删除 OSS 文件
+	// 删除 OSS 文件
+	if analysis.DiagramOSSURL != "" && s.ossClient != nil {
+		objectKey := s.ossClient.ExtractObjectKey(analysis.DiagramOSSURL)
+		s.ossClient.Delete(objectKey)
+	}
 
 	return s.analysisRepo.Delete(analysisID)
 }

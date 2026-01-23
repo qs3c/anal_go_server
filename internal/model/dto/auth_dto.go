@@ -44,10 +44,16 @@ type UserInfo struct {
 
 // QuotaInfo 配额信息
 type QuotaInfo struct {
+	Tier           string `json:"tier,omitempty"`
 	DailyQuota     int    `json:"daily_quota"`
+	DailyLimit     int    `json:"daily_limit,omitempty"`
 	QuotaUsedToday int    `json:"quota_used_today"`
+	DailyUsed      int    `json:"daily_used,omitempty"`
 	QuotaRemaining int    `json:"quota_remaining"`
+	DailyRemain    int    `json:"daily_remain,omitempty"`
+	MaxDepth       int    `json:"max_depth,omitempty"`
 	QuotaResetAt   string `json:"quota_reset_at,omitempty"`
+	ResetAt        string `json:"reset_at,omitempty"`
 }
 
 // UpdateProfileRequest 更新用户信息请求

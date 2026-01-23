@@ -8,6 +8,8 @@ import (
 	"github.com/qs3c/anal_go_server/internal/api"
 	"github.com/qs3c/anal_go_server/internal/api/handler"
 	"github.com/qs3c/anal_go_server/internal/database"
+	"github.com/qs3c/anal_go_server/internal/pkg/cron"
+	"github.com/qs3c/anal_go_server/internal/pkg/oss"
 	"github.com/qs3c/anal_go_server/internal/pkg/queue"
 	"github.com/qs3c/anal_go_server/internal/pkg/ws"
 	"github.com/qs3c/anal_go_server/internal/repository"
@@ -44,6 +46,18 @@ func main() {
 	go wsHub.Run()
 	log.Println("WebSocket hub started")
 
+	// 初始化 OSS 客户端（可选）
+	var ossClient *oss.Client
+	if cfg.OSS.Endpoint != "" {
+		var err error
+		ossClient, err = oss.NewClient(&cfg.OSS)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize OSS client: %v", err)
+		} else {
+			log.Println("OSS client initialized")
+		}
+	}
+
 	// 初始化 Repository
 	userRepo := repository.NewUserRepository(db)
 	analysisRepo := repository.NewAnalysisRepository(db)
@@ -53,9 +67,9 @@ func main() {
 
 	// 初始化 Service
 	authService := service.NewAuthService(userRepo, cfg)
-	userService := service.NewUserService(userRepo, cfg)
+	userService := service.NewUserService(userRepo, ossClient, cfg)
 	quotaService := service.NewQuotaService(userRepo, cfg)
-	analysisService := service.NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, cfg)
+	analysisService := service.NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, ossClient, cfg)
 	communityService := service.NewCommunityService(analysisRepo, interactionRepo, cfg)
 	commentService := service.NewCommentService(commentRepo, analysisRepo, userRepo, cfg)
 
@@ -67,6 +81,12 @@ func main() {
 	websocketHandler := handler.NewWebSocketHandler(wsHub, cfg.JWT.Secret)
 	communityHandler := handler.NewCommunityHandler(communityService)
 	commentHandler := handler.NewCommentHandler(commentService)
+	quotaHandler := handler.NewQuotaHandler(quotaService)
+
+	// 初始化 Cron 服务
+	cronService := cron.NewService(quotaService)
+	cronService.Start()
+	log.Println("Cron service started")
 
 	// 初始化 Router
 	router := api.NewRouter(
@@ -77,6 +97,7 @@ func main() {
 		websocketHandler,
 		communityHandler,
 		commentHandler,
+		quotaHandler,
 		cfg,
 	)
 	engine := router.Setup()

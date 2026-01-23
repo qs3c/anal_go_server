@@ -88,17 +88,23 @@ func (h *UserHandler) UploadAvatar(c *gin.Context) {
 
 	// 验证文件类型
 	contentType := file.Header.Get("Content-Type")
-	if contentType != "image/jpeg" && contentType != "image/png" {
-		response.ParamError(c, "只支持 jpg/png 格式")
+	if contentType != "image/jpeg" && contentType != "image/png" && contentType != "image/webp" {
+		response.ParamError(c, "只支持 jpg/png/webp 格式")
 		return
 	}
 
-	// TODO: 上传到 OSS
-	// 暂时返回占位 URL
-	avatarURL := "https://cdn.example.com/avatars/placeholder.jpg"
+	// 打开文件
+	f, err := file.Open()
+	if err != nil {
+		response.ServerError(c, "文件读取失败")
+		return
+	}
+	defer f.Close()
 
-	if err := h.userService.UpdateAvatar(userID, avatarURL); err != nil {
-		response.ServerError(c, "")
+	// 上传到 OSS
+	avatarURL, err := h.userService.UploadAvatar(userID, f, file.Filename)
+	if err != nil {
+		response.ServerError(c, "上传失败")
 		return
 	}
 

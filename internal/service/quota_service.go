@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/qs3c/anal_go_server/config"
+	"github.com/qs3c/anal_go_server/internal/model/dto"
 	"github.com/qs3c/anal_go_server/internal/repository"
 )
 
@@ -120,4 +121,39 @@ func (s *QuotaService) resetUserQuota(userID int64) error {
 func (s *QuotaService) ResetAllQuotas() error {
 	nextReset := time.Now().Add(24 * time.Hour).Truncate(24 * time.Hour)
 	return s.userRepo.ResetAllQuotas(nextReset)
+}
+
+// GetQuotaInfo 获取用户配额信息
+func (s *QuotaService) GetQuotaInfo(userID int64) (*dto.QuotaInfo, error) {
+	user, err := s.userRepo.GetByID(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 检查是否需要重置
+	if user.QuotaResetAt != nil && time.Now().After(*user.QuotaResetAt) {
+		if err := s.resetUserQuota(userID); err != nil {
+			return nil, err
+		}
+		user, _ = s.userRepo.GetByID(userID)
+	}
+
+	dailyRemain := user.DailyQuota - user.QuotaUsedToday
+	if dailyRemain < 0 {
+		dailyRemain = 0
+	}
+
+	info := &dto.QuotaInfo{
+		Tier:        user.SubscriptionLevel,
+		DailyLimit:  user.DailyQuota,
+		DailyUsed:   user.QuotaUsedToday,
+		DailyRemain: dailyRemain,
+		MaxDepth:    s.GetMaxDepth(user.SubscriptionLevel),
+	}
+
+	if user.QuotaResetAt != nil {
+		info.ResetAt = user.QuotaResetAt.Format(time.RFC3339)
+	}
+
+	return info, nil
 }

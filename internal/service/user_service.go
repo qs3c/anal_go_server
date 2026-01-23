@@ -2,6 +2,8 @@ package service
 
 import (
 	"errors"
+	"io"
+	"path/filepath"
 	"time"
 
 	"gorm.io/gorm"
@@ -9,18 +11,21 @@ import (
 	"github.com/qs3c/anal_go_server/config"
 	"github.com/qs3c/anal_go_server/internal/model"
 	"github.com/qs3c/anal_go_server/internal/model/dto"
+	"github.com/qs3c/anal_go_server/internal/pkg/oss"
 	"github.com/qs3c/anal_go_server/internal/repository"
 )
 
 type UserService struct {
-	userRepo *repository.UserRepository
-	cfg      *config.Config
+	userRepo  *repository.UserRepository
+	ossClient *oss.Client
+	cfg       *config.Config
 }
 
-func NewUserService(userRepo *repository.UserRepository, cfg *config.Config) *UserService {
+func NewUserService(userRepo *repository.UserRepository, ossClient *oss.Client, cfg *config.Config) *UserService {
 	return &UserService{
-		userRepo: userRepo,
-		cfg:      cfg,
+		userRepo:  userRepo,
+		ossClient: ossClient,
+		cfg:       cfg,
 	}
 }
 
@@ -70,11 +75,43 @@ func (s *UserService) UpdateProfile(userID int64, req *dto.UpdateProfileRequest)
 	return s.buildUserInfoWithQuota(user), nil
 }
 
-// UpdateAvatar 更新用户头像
+// UpdateAvatar 更新用户头像 URL
 func (s *UserService) UpdateAvatar(userID int64, avatarURL string) error {
 	return s.userRepo.UpdateFields(userID, map[string]interface{}{
 		"avatar_url": avatarURL,
 	})
+}
+
+// UploadAvatar 上传用户头像到 OSS
+func (s *UserService) UploadAvatar(userID int64, file io.Reader, filename string) (string, error) {
+	if s.ossClient == nil {
+		return "", errors.New("OSS 客户端未配置")
+	}
+
+	// 读取文件内容
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return "", err
+	}
+
+	// 获取文件扩展名
+	ext := filepath.Ext(filename)
+	if ext == "" {
+		ext = ".jpg"
+	}
+
+	// 上传到 OSS
+	avatarURL, err := s.ossClient.UploadAvatar(userID, data, ext)
+	if err != nil {
+		return "", err
+	}
+
+	// 更新用户头像 URL
+	if err := s.UpdateAvatar(userID, avatarURL); err != nil {
+		return "", err
+	}
+
+	return avatarURL, nil
 }
 
 func (s *UserService) buildUserInfoWithQuota(user *model.User) *dto.UserInfo {

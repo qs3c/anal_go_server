@@ -16,6 +16,7 @@ type Router struct {
 	websocketHandler *handler.WebSocketHandler
 	communityHandler *handler.CommunityHandler
 	commentHandler   *handler.CommentHandler
+	quotaHandler     *handler.QuotaHandler
 	cfg              *config.Config
 }
 
@@ -27,6 +28,7 @@ func NewRouter(
 	websocketHandler *handler.WebSocketHandler,
 	communityHandler *handler.CommunityHandler,
 	commentHandler *handler.CommentHandler,
+	quotaHandler *handler.QuotaHandler,
 	cfg *config.Config,
 ) *Router {
 	return &Router{
@@ -37,6 +39,7 @@ func NewRouter(
 		websocketHandler: websocketHandler,
 		communityHandler: communityHandler,
 		commentHandler:   commentHandler,
+		quotaHandler:     quotaHandler,
 		cfg:              cfg,
 	}
 }
@@ -79,6 +82,7 @@ func (r *Router) Setup() *gin.Engine {
 				user.GET("/profile", r.userHandler.GetProfile)
 				user.PUT("/profile", r.userHandler.UpdateProfile)
 				user.POST("/avatar", r.userHandler.UploadAvatar)
+				user.GET("/quota", r.quotaHandler.GetQuota)
 			}
 
 			// 分析
