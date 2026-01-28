@@ -1,0 +1,107 @@
+server:
+  host: 0.0.0.0
+  port: 8080
+  mode: release
+
+database:
+  host: mysql
+  port: 3306
+  username: anal_user
+  password: anal_password
+  database: anal_go
+  max_idle_conns: 10
+  max_open_conns: 100
+
+redis:
+  host: redis
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 10
+
+jwt:
+  secret: your_jwt_secret_key_change_in_production
+  expire_hours: 168
+
+oss:
+  endpoint: oss-cn-hangzhou.aliyuncs.com
+  access_key_id: ""
+  access_key_secret: ""
+  bucket_name: go-analyzer
+  cdn_domain: https://cdn.example.com
+
+oauth:
+  github:
+    client_id: ""
+    client_secret: ""
+    redirect_uri: http://localhost:8080/api/v1/auth/github/callback
+  wechat:
+    app_id: ""
+    app_secret: ""
+    redirect_uri: http://localhost:8080/api/v1/auth/wechat/callback
+
+email:
+  smtp_host: smtp.gmail.com
+  smtp_port: 587
+  username: ""
+  password: ""
+  from: noreply@example.com
+
+queue:
+  analysis_queue: analysis_jobs
+  max_workers: 5
+
+cors:
+  allowed_origins:
+    - http://localhost:3000
+    - http://localhost:5173
+  allowed_methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - OPTIONS
+  allowed_headers:
+    - Authorization
+    - Content-Type
+
+subscription:
+  levels:
+    free:
+      daily_quota: 5
+      max_depth: 3
+    basic:
+      daily_quota: 30
+      max_depth: 5
+      price: 19.9
+    pro:
+      daily_quota: 100
+      max_depth: 10
+      price: 49.9
+
+models:
+  - name: gpt-3.5-turbo
+    display_name: GPT-3.5 Turbo
+    required_level: free
+    api_provider: openai
+    description: 基础模型，适合简单分析
+  - name: claude-haiku
+    display_name: Claude Haiku
+    required_level: free
+    api_provider: anthropic
+    description: 基础模型，快速分析
+  - name: gpt-4o-mini
+    display_name: GPT-4o Mini
+    required_level: basic
+    api_provider: openai
+    description: 中级模型，平衡速度和质量
+  - name: gpt-4
+    display_name: GPT-4
+    required_level: pro
+    api_provider: openai
+    description: 高级模型，适合复杂分析
+  - name: claude-sonnet
+    display_name: Claude Sonnet
+    required_level: pro
+    api_provider: anthropic
+    description: 高级模型，高质量分析

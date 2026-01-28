@@ -48,3 +48,6 @@ temp/
 
 # Build output
 /dist/
+
+# Vendored dependencies (regenerate with: go mod vendor)
+/vendor/

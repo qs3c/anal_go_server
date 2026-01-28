@@ -1,34 +1,26 @@
 # Build stage
-FROM golang:1.22-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
-WORKDIR /app
+WORKDIR /build
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
 
-# Copy go mod files
-COPY go.mod go.sum ./
-RUN go mod download
-
-# Copy source code
+# Copy source code (including vendor directory)
 COPY . .
 
-# Build the worker binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o worker ./cmd/worker
+# Build
+RUN CGO_ENABLED=0 go build -mod=vendor -o worker ./cmd/worker
 
 # Final stage
 FROM alpine:latest
 
 WORKDIR /app
 
-# Install runtime dependencies
-RUN apk --no-cache add ca-certificates tzdata
+# Install runtime dependencies (git needed for cloning repos)
+RUN apk --no-cache add ca-certificates tzdata git
 
 # Copy binary from builder
-COPY --from=builder /app/worker .
+COPY --from=builder /build/worker .
 
-# Copy config file (will be overridden by volume mount in production)
-COPY config.yaml .
-
-# Run the worker
 CMD ["./worker"]

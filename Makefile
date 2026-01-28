@@ -1,4 +1,4 @@
-.PHONY: all build test clean dev-server dev-worker docker-build docker-up docker-down migrate-up migrate-down migrate-create lint fmt help
+.PHONY: all build test clean dev-server dev-worker docker-build docker-up docker-down migrate-up migrate-down migrate-create lint fmt help vendor
 
 # Go parameters
 GOCMD=go
@@ -90,9 +90,13 @@ download: ## Download dependencies
 
 ## Docker
 
-docker-build: ## Build Docker images
+docker-build: vendor ## Build Docker images (uses vendored dependencies)
 	@echo "Building Docker images..."
 	docker-compose build
+
+vendor: ## Vendor dependencies locally
+	@echo "Vendoring dependencies..."
+	$(GOMOD) vendor
 
 docker-up: ## Start all services
 	@echo "Starting services..."

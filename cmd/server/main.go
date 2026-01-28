@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/qs3c/anal_go_server/internal/database"
 	"github.com/qs3c/anal_go_server/internal/pkg/cron"
 	"github.com/qs3c/anal_go_server/internal/pkg/oss"
+	"github.com/qs3c/anal_go_server/internal/pkg/pubsub"
 	"github.com/qs3c/anal_go_server/internal/pkg/queue"
 	"github.com/qs3c/anal_go_server/internal/pkg/ws"
 	"github.com/qs3c/anal_go_server/internal/repository"
@@ -45,6 +47,22 @@ func main() {
 	wsHub := ws.NewHub()
 	go wsHub.Run()
 	log.Println("WebSocket hub started")
+
+	// 启动 Redis 订阅，转发进度消息到 WebSocket
+	subscriber := pubsub.NewSubscriber(rdb)
+	go func() {
+		ctx := context.Background()
+		err := subscriber.Subscribe(ctx, func(msg *pubsub.ProgressMessage) {
+			wsHub.SendToUser(msg.UserID, &ws.Message{
+				Type: msg.Type,
+				Data: msg,
+			})
+		})
+		if err != nil {
+			log.Printf("Redis subscriber error: %v", err)
+		}
+	}()
+	log.Println("Redis subscriber started")
 
 	// 初始化 OSS 客户端（可选）
 	var ossClient *oss.Client
