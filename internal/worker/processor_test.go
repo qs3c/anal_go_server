@@ -99,3 +99,118 @@ func TestProcessor_GetModelConfig_NilConfig(t *testing.T) {
 	assert.Empty(t, provider)
 	assert.Empty(t, apiKey)
 }
+
+func TestProcessor_GetModelConfig_MultipleModels(t *testing.T) {
+	cfg := &config.Config{
+		Models: []config.ModelConfig{
+			{Name: "gpt-3.5-turbo", APIProvider: "openai", APIKey: "key1"},
+			{Name: "gpt-4", APIProvider: "openai", APIKey: "key2"},
+			{Name: "gpt-4-turbo", APIProvider: "openai", APIKey: "key3"},
+			{Name: "claude-3-opus", APIProvider: "anthropic", APIKey: "key4"},
+			{Name: "claude-3-sonnet", APIProvider: "anthropic", APIKey: "key5"},
+		},
+	}
+
+	processor := &Processor{cfg: cfg}
+
+	// Test first model
+	provider, apiKey := processor.getModelConfig("gpt-3.5-turbo")
+	assert.Equal(t, "openai", provider)
+	assert.Equal(t, "key1", apiKey)
+
+	// Test middle model
+	provider, apiKey = processor.getModelConfig("gpt-4-turbo")
+	assert.Equal(t, "openai", provider)
+	assert.Equal(t, "key3", apiKey)
+
+	// Test last model
+	provider, apiKey = processor.getModelConfig("claude-3-sonnet")
+	assert.Equal(t, "anthropic", provider)
+	assert.Equal(t, "key5", apiKey)
+}
+
+func TestProcessor_GetModelConfig_CaseSensitive(t *testing.T) {
+	cfg := &config.Config{
+		Models: []config.ModelConfig{
+			{Name: "GPT-4", APIProvider: "openai", APIKey: "key1"},
+		},
+	}
+
+	processor := &Processor{cfg: cfg}
+
+	// Exact match should work
+	provider, apiKey := processor.getModelConfig("GPT-4")
+	assert.Equal(t, "openai", provider)
+	assert.Equal(t, "key1", apiKey)
+
+	// Different case should not match
+	provider, apiKey = processor.getModelConfig("gpt-4")
+	assert.Empty(t, provider)
+	assert.Empty(t, apiKey)
+}
+
+func TestProcessor_GetModelConfig_EmptyAPIKey(t *testing.T) {
+	cfg := &config.Config{
+		Models: []config.ModelConfig{
+			{Name: "free-model", APIProvider: "local", APIKey: ""},
+		},
+	}
+
+	processor := &Processor{cfg: cfg}
+
+	provider, apiKey := processor.getModelConfig("free-model")
+	assert.Equal(t, "local", provider)
+	assert.Empty(t, apiKey) // Empty API key is valid for some local models
+}
+
+func TestProcessor_GetModelConfig_SpecialCharacters(t *testing.T) {
+	cfg := &config.Config{
+		Models: []config.ModelConfig{
+			{Name: "model-with-special_chars.v1", APIProvider: "custom", APIKey: "key"},
+		},
+	}
+
+	processor := &Processor{cfg: cfg}
+
+	provider, apiKey := processor.getModelConfig("model-with-special_chars.v1")
+	assert.Equal(t, "custom", provider)
+	assert.Equal(t, "key", apiKey)
+}
+
+func TestNewProcessor_WithAllNilDeps(t *testing.T) {
+	cfg := &config.Config{
+		Models: []config.ModelConfig{
+			{Name: "test-model", APIProvider: "test", APIKey: "test-key"},
+		},
+	}
+
+	processor := NewProcessor(nil, nil, nil, nil, cfg)
+
+	assert.NotNil(t, processor)
+	assert.Nil(t, processor.jobRepo)
+	assert.Nil(t, processor.analysisRepo)
+	assert.Nil(t, processor.ossClient)
+	assert.Nil(t, processor.publisher)
+	assert.Equal(t, cfg, processor.cfg)
+
+	// Should still be able to get model config
+	provider, _ := processor.getModelConfig("test-model")
+	assert.Equal(t, "test", provider)
+}
+
+func TestProcessor_GetModelConfig_FirstMatchWins(t *testing.T) {
+	// If there are duplicate model names (shouldn't happen but test behavior)
+	cfg := &config.Config{
+		Models: []config.ModelConfig{
+			{Name: "gpt-4", APIProvider: "first", APIKey: "key1"},
+			{Name: "gpt-4", APIProvider: "second", APIKey: "key2"},
+		},
+	}
+
+	processor := &Processor{cfg: cfg}
+
+	// Should return first match
+	provider, apiKey := processor.getModelConfig("gpt-4")
+	assert.Equal(t, "first", provider)
+	assert.Equal(t, "key1", apiKey)
+}
