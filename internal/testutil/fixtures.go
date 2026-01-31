@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -10,14 +11,18 @@ import (
 	"github.com/qs3c/anal_go_server/internal/model"
 )
 
+// 用于生成唯一标识符的原子计数器
+var userCounter uint64
+
 // TestUser 创建测试用户
 func TestUser(t *testing.T, db *gorm.DB, opts ...func(*model.User)) *model.User {
 	t.Helper()
 
-	email := fmt.Sprintf("test_%d@example.com", time.Now().UnixNano())
+	id := atomic.AddUint64(&userCounter, 1)
+	email := fmt.Sprintf("test_%d_%d@example.com", time.Now().UnixNano(), id)
 	passwordHash := "$2a$10$abcdefghijklmnopqrstuvwxyz123456" // bcrypt hash placeholder
 	user := &model.User{
-		Username:          fmt.Sprintf("testuser_%d", time.Now().UnixNano()%10000),
+		Username:          fmt.Sprintf("testuser_%d_%d", time.Now().UnixNano(), id),
 		Email:             &email,
 		PasswordHash:      &passwordHash,
 		SubscriptionLevel: "free",

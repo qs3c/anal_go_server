@@ -98,6 +98,13 @@ func (s *AuthService) Register(req *dto.RegisterRequest) (*dto.RegisterResponse,
 	}
 
 	// TODO: 发送验证邮件
+	// 开发环境临时方案：自动验证邮箱
+	if s.cfg.Server.Mode == "debug" {
+		user.EmailVerified = true
+		if err := s.userRepo.Update(user); err != nil {
+			return nil, err
+		}
+	}
 
 	return &dto.RegisterResponse{
 		UserID: user.ID,
@@ -114,8 +121,8 @@ func (s *AuthService) Login(req *dto.LoginRequest) (*dto.LoginResponse, error) {
 		return nil, err
 	}
 
-	// 检查邮箱是否验证
-	if !user.EmailVerified {
+	// 检查邮箱是否验证（生产环境强制要求，开发环境跳过）
+	if !user.EmailVerified && s.cfg.Server.Mode != "debug" {
 		return nil, ErrEmailNotVerified
 	}
 

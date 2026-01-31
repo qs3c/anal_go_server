@@ -5,6 +5,8 @@
 *.so
 *.dylib
 /bin/
+/server
+/worker
 
 # Test binary
 *.test
@@ -46,3 +48,7 @@ temp/
 
 # Build output
 /dist/
+
+# Vendored dependencies (regenerate with: go mod vendor)
+/vendor/
+anal_go_agent/
