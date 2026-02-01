@@ -11,8 +11,8 @@ type User struct {
 	PasswordHash          *string    `gorm:"size:255" json:"-"`
 	AvatarURL             string     `gorm:"size:500" json:"avatar_url"`
 	Bio                   string     `gorm:"type:text" json:"bio"`
-	GithubID              *string    `gorm:"size:50;uniqueIndex" json:"-"`
-	WechatOpenID          *string    `gorm:"size:100;uniqueIndex" json:"-"`
+	GithubID              *string    `gorm:"column:github_id;size:50;uniqueIndex" json:"-"`
+	WechatOpenID          *string    `gorm:"column:wechat_openid;size:100;uniqueIndex" json:"-"`
 	SubscriptionLevel     string     `gorm:"size:20;default:free" json:"subscription_level"`
 	DailyQuota            int        `gorm:"default:5" json:"daily_quota"`
 	QuotaUsedToday        int        `gorm:"default:0" json:"quota_used_today"`

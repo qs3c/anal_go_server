@@ -1,7 +1,7 @@
 server:
   host: 0.0.0.0
   port: 8080
-  mode: release
+  mode: debug
 
 database:
   host: mysql
@@ -90,6 +90,12 @@ models:
     required_level: free
     api_provider: anthropic
     description: 基础模型，快速分析
+  - name: glm-4.7
+    display_name: GLM-4.7
+    required_level: free
+    api_provider: zhipu
+    api_key: "c7eec578187842ff97b2919ee4c4ba43.mt97WsKSCmjahKCE"
+    description: 智谱AI最新模型，高性价比
   - name: gpt-4o-mini
     display_name: GPT-4o Mini
     required_level: basic

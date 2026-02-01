@@ -39,7 +39,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		case errors.Is(err, service.ErrUsernameExists):
 			response.ParamError(c, err.Error())
 		default:
-			response.ServerError(c, "")
+			// 记录详细错误信息用于调试
+			fmt.Printf("Register error: %v\n", err)
+			response.ServerError(c, err.Error())
 		}
 		return
 	}
