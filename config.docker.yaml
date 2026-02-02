@@ -111,3 +111,10 @@ models:
     required_level: pro
     api_provider: anthropic
     description: 高级模型，高质量分析
+
+upload:
+  max_size: 104857600  # 100MB
+  temp_dir: /tmp/uploads
+  expire_hours: 1
+  allowed_extensions:
+    - .zip

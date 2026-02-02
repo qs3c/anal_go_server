@@ -18,6 +18,7 @@ type Config struct {
 	CORS         CORSConfig         `mapstructure:"cors"`
 	Subscription SubscriptionConfig `mapstructure:"subscription"`
 	Models       []ModelConfig      `mapstructure:"models"`
+	Upload       UploadConfig       `mapstructure:"upload"`
 }
 
 type ServerConfig struct {
@@ -110,6 +111,13 @@ type ModelConfig struct {
 	APIKey        string `mapstructure:"api_key"`
 	APIProvider   string `mapstructure:"api_provider"`
 	Description   string `mapstructure:"description"`
+}
+
+type UploadConfig struct {
+	MaxSize           int64    `mapstructure:"max_size"`           // 最大文件大小（字节）
+	TempDir           string   `mapstructure:"temp_dir"`           // 临时目录
+	ExpireHours       int      `mapstructure:"expire_hours"`       // 过期时间（小时）
+	AllowedExtensions []string `mapstructure:"allowed_extensions"` // 允许的扩展名
 }
 
 func Load(configPath string) (*Config, error) {
