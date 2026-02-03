@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/qs3c/anal_go_server/internal/model"
 	"github.com/qs3c/anal_go_server/internal/model/dto"
 	"github.com/qs3c/anal_go_server/internal/pkg/oss"
+	"github.com/qs3c/anal_go_server/internal/pkg/queue"
 	"github.com/qs3c/anal_go_server/internal/repository"
 )
 
@@ -21,12 +23,14 @@ var (
 )
 
 type AnalysisService struct {
-	analysisRepo *repository.AnalysisRepository
-	jobRepo      *repository.JobRepository
-	userRepo     *repository.UserRepository
-	quotaService *QuotaService
-	ossClient    *oss.Client
-	cfg          *config.Config
+	analysisRepo  *repository.AnalysisRepository
+	jobRepo       *repository.JobRepository
+	userRepo      *repository.UserRepository
+	quotaService  *QuotaService
+	uploadService *UploadService
+	ossClient     *oss.Client
+	jobQueue      *queue.Queue
+	cfg           *config.Config
 }
 
 func NewAnalysisService(
@@ -34,16 +38,20 @@ func NewAnalysisService(
 	jobRepo *repository.JobRepository,
 	userRepo *repository.UserRepository,
 	quotaService *QuotaService,
+	uploadService *UploadService,
 	ossClient *oss.Client,
+	jobQueue *queue.Queue,
 	cfg *config.Config,
 ) *AnalysisService {
 	return &AnalysisService{
-		analysisRepo: analysisRepo,
-		jobRepo:      jobRepo,
-		userRepo:     userRepo,
-		quotaService: quotaService,
-		ossClient:    ossClient,
-		cfg:          cfg,
+		analysisRepo:  analysisRepo,
+		jobRepo:       jobRepo,
+		userRepo:      userRepo,
+		quotaService:  quotaService,
+		uploadService: uploadService,
+		ossClient:     ossClient,
+		jobQueue:      jobQueue,
+		cfg:           cfg,
 	}
 }
 
@@ -78,7 +86,29 @@ func (s *AnalysisService) Create(userID int64, req *dto.CreateAnalysisRequest) (
 			return nil, err
 		}
 
-		analysis.RepoURL = req.RepoURL
+		// Handle source type
+		sourceType := req.SourceType
+		if sourceType == "" {
+			sourceType = "github" // default
+		}
+
+		if sourceType == "upload" {
+			if req.UploadID == "" {
+				return nil, errors.New("upload_id 不能为空")
+			}
+			if s.uploadService != nil {
+				if _, err := s.uploadService.GetUploadPath(req.UploadID); err != nil {
+					return nil, err
+				}
+			}
+			analysis.SourceType = "upload"
+			analysis.UploadID = req.UploadID
+			analysis.StartFile = req.StartFile
+		} else {
+			analysis.SourceType = "github"
+			analysis.RepoURL = req.RepoURL
+		}
+
 		analysis.StartStruct = req.StartStruct
 		analysis.AnalysisDepth = req.AnalysisDepth
 		analysis.ModelName = req.ModelName
@@ -148,7 +178,26 @@ func (s *AnalysisService) Create(userID int64, req *dto.CreateAnalysisRequest) (
 
 		resp.JobID = job.ID
 
-		// TODO: 加入 Redis 队列
+		// 加入 Redis 队列
+		if s.jobQueue != nil {
+			jobMsg := &queue.JobMessage{
+				JobID:       job.ID,
+				AnalysisID:  analysis.ID,
+				UserID:      userID,
+				SourceType:  analysis.SourceType,
+				RepoURL:     req.RepoURL,
+				UploadID:    req.UploadID,
+				StartFile:   req.StartFile,
+				StartStruct: req.StartStruct,
+				Depth:       req.AnalysisDepth,
+				ModelName:   req.ModelName,
+			}
+			if err := s.jobQueue.Push(context.Background(), jobMsg); err != nil {
+				// 如果队列推送失败，退还配额
+				s.quotaService.RefundQuota(userID)
+				return nil, err
+			}
+		}
 	}
 
 	return resp, nil

@@ -87,7 +87,7 @@ func main() {
 	authService := service.NewAuthService(userRepo, cfg)
 	userService := service.NewUserService(userRepo, ossClient, cfg)
 	quotaService := service.NewQuotaService(userRepo, cfg)
-	analysisService := service.NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, ossClient, cfg)
+	analysisService := service.NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, ossClient, nil, cfg)
 	communityService := service.NewCommunityService(analysisRepo, interactionRepo, cfg)
 	commentService := service.NewCommentService(commentRepo, analysisRepo, userRepo, cfg)
 

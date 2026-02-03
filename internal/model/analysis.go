@@ -38,6 +38,9 @@ type Analysis struct {
 	StartStruct      string      `gorm:"size:100" json:"start_struct,omitempty"`
 	AnalysisDepth    int         `json:"analysis_depth,omitempty"`
 	ModelName        string      `gorm:"size:50" json:"model_name,omitempty"`
+	SourceType       string      `gorm:"size:20;default:github"` // github 或 upload
+	UploadID         string      `gorm:"size:64"`
+	StartFile        string      `gorm:"size:500"`
 	DiagramOSSURL    string      `gorm:"size:500" json:"diagram_oss_url,omitempty"`
 	DiagramSize      int         `json:"diagram_size,omitempty"`
 	Status           string      `gorm:"size:20;default:draft;index" json:"status"` // draft, pending, analyzing, completed, failed

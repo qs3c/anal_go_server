@@ -18,7 +18,10 @@ type JobMessage struct {
 	JobID       int64  `json:"job_id"`
 	AnalysisID  int64  `json:"analysis_id"`
 	UserID      int64  `json:"user_id"`
+	SourceType  string `json:"source_type"`
 	RepoURL     string `json:"repo_url"`
+	UploadID    string `json:"upload_id"`
+	StartFile   string `json:"start_file"`
 	StartStruct string `json:"start_struct"`
 	Depth       int    `json:"depth"`
 	ModelName   string `json:"model_name"`
