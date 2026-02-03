@@ -87,7 +87,8 @@ func main() {
 	authService := service.NewAuthService(userRepo, cfg)
 	userService := service.NewUserService(userRepo, ossClient, cfg)
 	quotaService := service.NewQuotaService(userRepo, cfg)
-	analysisService := service.NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, ossClient, nil, cfg)
+	uploadService := service.NewUploadService(cfg)
+	analysisService := service.NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, uploadService, ossClient, nil, cfg)
 	communityService := service.NewCommunityService(analysisRepo, interactionRepo, cfg)
 	commentService := service.NewCommentService(commentRepo, analysisRepo, userRepo, cfg)
 
@@ -100,6 +101,7 @@ func main() {
 	communityHandler := handler.NewCommunityHandler(communityService)
 	commentHandler := handler.NewCommentHandler(commentService)
 	quotaHandler := handler.NewQuotaHandler(quotaService)
+	uploadHandler := handler.NewUploadHandler(uploadService, cfg)
 
 	// 初始化 Cron 服务
 	cronService := cron.NewService(quotaService)
@@ -116,6 +118,7 @@ func main() {
 		communityHandler,
 		commentHandler,
 		quotaHandler,
+		uploadHandler,
 		cfg,
 	)
 	engine := router.Setup()

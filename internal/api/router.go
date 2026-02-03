@@ -17,6 +17,7 @@ type Router struct {
 	communityHandler *handler.CommunityHandler
 	commentHandler   *handler.CommentHandler
 	quotaHandler     *handler.QuotaHandler
+	uploadHandler    *handler.UploadHandler
 	cfg              *config.Config
 }
 
@@ -29,6 +30,7 @@ func NewRouter(
 	communityHandler *handler.CommunityHandler,
 	commentHandler *handler.CommentHandler,
 	quotaHandler *handler.QuotaHandler,
+	uploadHandler *handler.UploadHandler,
 	cfg *config.Config,
 ) *Router {
 	return &Router{
@@ -40,6 +42,7 @@ func NewRouter(
 		communityHandler: communityHandler,
 		commentHandler:   commentHandler,
 		quotaHandler:     quotaHandler,
+		uploadHandler:    uploadHandler,
 		cfg:              cfg,
 	}
 }
@@ -97,6 +100,9 @@ func (r *Router) Setup() *gin.Engine {
 				analyses.DELETE("/:id/share", r.analysisHandler.Unshare)
 				analyses.GET("/:id/job-status", r.analysisHandler.GetJobStatus)
 			}
+
+			// 上传相关
+			authenticated.POST("/upload/parse", r.uploadHandler.Parse)
 		}
 
 		// 公开接口 - 社区（可选认证）
