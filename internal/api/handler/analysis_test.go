@@ -49,7 +49,7 @@ func setupAnalysisHandler(t *testing.T) (*AnalysisHandler, *testContext, func())
 	}
 
 	quotaService := service.NewQuotaService(userRepo, cfg)
-	analysisService := service.NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	analysisService := service.NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 	handler := NewAnalysisHandler(analysisService)
 
 	ctx := &testContext{

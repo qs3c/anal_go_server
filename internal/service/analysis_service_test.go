@@ -36,7 +36,7 @@ func setupAnalysisService(t *testing.T) (*AnalysisService, func()) {
 	}
 
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	cleanup := func() {
 		testutil.CleanupTestDB(t, db)
@@ -54,7 +54,7 @@ func TestAnalysisService_Create_Manual(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	cfg := &config.Config{}
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	user := testutil.TestUser(t, db)
 
@@ -86,7 +86,7 @@ func TestAnalysisService_Create_AI(t *testing.T) {
 		},
 	}
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	user := testutil.TestUser(t, db, testutil.WithQuotaUsed(0))
 
@@ -123,7 +123,7 @@ func TestAnalysisService_Create_AI_QuotaExceeded(t *testing.T) {
 		},
 	}
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	user := testutil.TestUser(t, db, testutil.WithQuotaUsed(5)) // Quota exhausted
 
@@ -158,7 +158,7 @@ func TestAnalysisService_Create_AI_DepthExceeded(t *testing.T) {
 		},
 	}
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	user := testutil.TestUser(t, db)
 
@@ -184,7 +184,7 @@ func TestAnalysisService_GetByID_Success(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	cfg := &config.Config{}
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	user := testutil.TestUser(t, db)
 	analysis := testutil.TestAnalysis(t, db, user.ID, testutil.WithTitle("Test Analysis"))
@@ -212,7 +212,7 @@ func TestAnalysisService_GetByID_NoPermission(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	cfg := &config.Config{}
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	user1 := testutil.TestUser(t, db)
 	user2 := testutil.TestUser(t, db)
@@ -231,7 +231,7 @@ func TestAnalysisService_List(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	cfg := &config.Config{}
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	user := testutil.TestUser(t, db)
 	testutil.TestAnalysis(t, db, user.ID, testutil.WithTitle("Analysis 1"))
@@ -253,7 +253,7 @@ func TestAnalysisService_List_WithSearch(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	cfg := &config.Config{}
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	user := testutil.TestUser(t, db)
 	testutil.TestAnalysis(t, db, user.ID, testutil.WithTitle("Go Project"))
@@ -275,7 +275,7 @@ func TestAnalysisService_Update_Success(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	cfg := &config.Config{}
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	user := testutil.TestUser(t, db)
 	analysis := testutil.TestAnalysis(t, db, user.ID, testutil.WithTitle("Original Title"))
@@ -312,7 +312,7 @@ func TestAnalysisService_Update_NoPermission(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	cfg := &config.Config{}
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	user1 := testutil.TestUser(t, db)
 	user2 := testutil.TestUser(t, db)
@@ -333,7 +333,7 @@ func TestAnalysisService_Delete_Success(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	cfg := &config.Config{}
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	user := testutil.TestUser(t, db)
 	analysis := testutil.TestAnalysis(t, db, user.ID)
@@ -363,7 +363,7 @@ func TestAnalysisService_Delete_NoPermission(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	cfg := &config.Config{}
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	user1 := testutil.TestUser(t, db)
 	user2 := testutil.TestUser(t, db)
@@ -382,7 +382,7 @@ func TestAnalysisService_Share_Success(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	cfg := &config.Config{}
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	user := testutil.TestUser(t, db)
 	analysis := testutil.TestAnalysis(t, db, user.ID, testutil.WithStatus("completed"))
@@ -412,7 +412,7 @@ func TestAnalysisService_Share_NotCompleted(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	cfg := &config.Config{}
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	user := testutil.TestUser(t, db)
 	analysis := testutil.TestAnalysis(t, db, user.ID, testutil.WithStatus("draft"))
@@ -431,7 +431,7 @@ func TestAnalysisService_Unshare_Success(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	cfg := &config.Config{}
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	user := testutil.TestUser(t, db)
 	analysis := testutil.TestAnalysis(t, db, user.ID, testutil.WithPublic(true))
@@ -454,7 +454,7 @@ func TestAnalysisService_GetJobStatus_Success(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	cfg := &config.Config{}
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	user := testutil.TestUser(t, db)
 	analysis := testutil.TestAnalysis(t, db, user.ID)
@@ -483,7 +483,7 @@ func TestAnalysisService_GetJobStatus_NoPermission(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	cfg := &config.Config{}
 	quotaService := NewQuotaService(userRepo, cfg)
-	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, cfg)
+	service := NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, nil, nil, nil, cfg)
 
 	user1 := testutil.TestUser(t, db)
 	user2 := testutil.TestUser(t, db)

@@ -6,10 +6,13 @@ import "encoding/json"
 type CreateAnalysisRequest struct {
 	Title         string          `json:"title" binding:"required,max=200"`
 	CreationType  string          `json:"creation_type" binding:"required,oneof=ai manual"`
-	RepoURL       string          `json:"repo_url,omitempty" binding:"omitempty,url"`
-	StartStruct   string          `json:"start_struct,omitempty" binding:"omitempty,max=100"`
-	AnalysisDepth int             `json:"analysis_depth,omitempty" binding:"omitempty,min=1,max=10"`
-	ModelName     string          `json:"model_name,omitempty" binding:"omitempty,max=50"`
+	SourceType    string          `json:"source_type,omitempty"`    // "github" 或 "upload"
+	RepoURL       string          `json:"repo_url,omitempty"`
+	UploadID      string          `json:"upload_id,omitempty"`
+	StartFile     string          `json:"start_file,omitempty"`
+	StartStruct   string          `json:"start_struct,omitempty"`
+	AnalysisDepth int             `json:"analysis_depth,omitempty"`
+	ModelName     string          `json:"model_name,omitempty"`
 	DiagramData   json.RawMessage `json:"diagram_data,omitempty"`
 }
 
