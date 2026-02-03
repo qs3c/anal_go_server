@@ -41,7 +41,6 @@ func main() {
 
 	// 初始化 Queue
 	jobQueue := queue.NewQueue(rdb, cfg.Queue.AnalysisQueue)
-	_ = jobQueue // TODO: 传给 analysis service
 
 	// 初始化 WebSocket Hub
 	wsHub := ws.NewHub()
@@ -88,7 +87,7 @@ func main() {
 	userService := service.NewUserService(userRepo, ossClient, cfg)
 	quotaService := service.NewQuotaService(userRepo, cfg)
 	uploadService := service.NewUploadService(cfg)
-	analysisService := service.NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, uploadService, ossClient, nil, cfg)
+	analysisService := service.NewAnalysisService(analysisRepo, jobRepo, userRepo, quotaService, uploadService, ossClient, jobQueue, cfg)
 	communityService := service.NewCommunityService(analysisRepo, interactionRepo, cfg)
 	commentService := service.NewCommentService(commentRepo, analysisRepo, userRepo, cfg)
 
