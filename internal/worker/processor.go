@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/user/go-struct-analyzer/pkg/analyzer"
@@ -48,10 +50,6 @@ func (p *Processor) Process(ctx context.Context, msg *queue.JobMessage) error {
 		return fmt.Errorf("failed to get job: %w", err)
 	}
 
-	// 获取临时目录
-	tempDir := GetTempDir(job.ID)
-	defer CleanupRepo(tempDir)
-
 	// 更新状态为处理中
 	now := time.Now()
 	job.Status = "processing"
@@ -86,18 +84,45 @@ func (p *Processor) Process(ctx context.Context, msg *queue.JobMessage) error {
 		return err
 	}
 
-	// Step 1: 克隆仓库
-	log.Printf("Job %d: cloning repo %s", job.ID, msg.RepoURL)
-	job.CurrentStep = "正在克隆仓库"
-	p.jobRepo.Update(job)
-	publishProgress(pubsub.StepCloning, "processing", "")
+	// 根据来源类型决定项目路径
+	var projectPath string
+	var needCleanup bool
 
-	if err := ValidateRepoURL(msg.RepoURL); err != nil {
-		return handleError(pubsub.StepCloning, fmt.Errorf("invalid repo URL: %w", err))
+	if msg.SourceType == "upload" {
+		// Upload mode: use already uploaded files
+		projectPath = filepath.Join(p.cfg.Upload.TempDir, msg.UploadID)
+		if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+			return handleError(pubsub.StepCloning, fmt.Errorf("上传文件不存在或已过期"))
+		}
+		needCleanup = false // uploaded files managed by upload service
+
+		// Skip cloning, go directly to parsing
+		log.Printf("Job %d: using uploaded files at %s", job.ID, projectPath)
+		job.CurrentStep = "正在解析项目结构"
+		p.jobRepo.Update(job)
+		publishProgress(pubsub.StepParsing, "processing", "")
+	} else {
+		// GitHub mode: clone repository
+		projectPath = GetTempDir(job.ID)
+		needCleanup = true
+
+		log.Printf("Job %d: cloning repo %s", job.ID, msg.RepoURL)
+		job.CurrentStep = "正在克隆仓库"
+		p.jobRepo.Update(job)
+		publishProgress(pubsub.StepCloning, "processing", "")
+
+		if err := ValidateRepoURL(msg.RepoURL); err != nil {
+			return handleError(pubsub.StepCloning, fmt.Errorf("invalid repo URL: %w", err))
+		}
+
+		if err := CloneRepo(ctx, msg.RepoURL, projectPath); err != nil {
+			return handleError(pubsub.StepCloning, fmt.Errorf("clone failed: %w", err))
+		}
 	}
 
-	if err := CloneRepo(ctx, msg.RepoURL, tempDir); err != nil {
-		return handleError(pubsub.StepCloning, fmt.Errorf("clone failed: %w", err))
+	// Cleanup only if we cloned
+	if needCleanup {
+		defer CleanupRepo(projectPath)
 	}
 
 	// Step 2: 解析项目
@@ -111,7 +136,7 @@ func (p *Processor) Process(ctx context.Context, msg *queue.JobMessage) error {
 
 	// 创建分析器
 	opts := analyzer.Options{
-		ProjectPath: tempDir,
+		ProjectPath: projectPath,
 		StartStruct: msg.StartStruct,
 		MaxDepth:    msg.Depth,
 		LLMProvider: provider,
