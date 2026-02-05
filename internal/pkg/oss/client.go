@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
@@ -89,6 +90,21 @@ func (c *Client) GetURL(objectKey string) string {
 	return fmt.Sprintf("https://%s.%s/%s", c.bucketName, c.client.Config.Endpoint, objectKey)
 }
 
+// GetSignedURL 生成带签名的临时访问URL（默认1小时有效）
+func (c *Client) GetSignedURL(objectKey string, expireSeconds ...int64) (string, error) {
+	expire := int64(3600) // 默认1小时
+	if len(expireSeconds) > 0 && expireSeconds[0] > 0 {
+		expire = expireSeconds[0]
+	}
+
+	signedURL, err := c.bucket.SignURL(objectKey, oss.HTTPGet, expire)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate signed URL: %w", err)
+	}
+
+	return signedURL, nil
+}
+
 // getContentType 根据扩展名获取 Content-Type
 func getContentType(ext string) string {
 	switch ext {
@@ -109,11 +125,21 @@ func getContentType(ext string) string {
 
 // ExtractObjectKey 从 URL 中提取 object key
 func (c *Client) ExtractObjectKey(url string) string {
+	// 处理 CDN 域名
 	if c.cdnDomain != "" {
 		prefix := fmt.Sprintf("https://%s/", c.cdnDomain)
-		if len(url) > len(prefix) {
+		if strings.HasPrefix(url, prefix) {
 			return url[len(prefix):]
 		}
 	}
+
+	// 处理标准 OSS URL: https://bucket-name.endpoint/path/to/object
+	// 或: https://endpoint/bucket-name/path/to/object
+	parts := strings.Split(url, "/")
+	if len(parts) >= 4 {
+		// 从第4个部分开始是 object key
+		return strings.Join(parts[3:], "/")
+	}
+
 	return path.Base(url)
 }

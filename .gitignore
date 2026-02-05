@@ -53,3 +53,6 @@ temp/
 /vendor/
 anal_go_agent/
 .worktrees/
+
+# Test scripts
+test_*.go

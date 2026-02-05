@@ -47,22 +47,6 @@ func main() {
 	go wsHub.Run()
 	log.Println("WebSocket hub started")
 
-	// 启动 Redis 订阅，转发进度消息到 WebSocket
-	subscriber := pubsub.NewSubscriber(rdb)
-	go func() {
-		ctx := context.Background()
-		err := subscriber.Subscribe(ctx, func(msg *pubsub.ProgressMessage) {
-			wsHub.SendToUser(msg.UserID, &ws.Message{
-				Type: msg.Type,
-				Data: msg,
-			})
-		})
-		if err != nil {
-			log.Printf("Redis subscriber error: %v", err)
-		}
-	}()
-	log.Println("Redis subscriber started")
-
 	// 初始化 OSS 客户端（可选）
 	var ossClient *oss.Client
 	if cfg.OSS.Endpoint != "" {
@@ -121,6 +105,52 @@ func main() {
 		cfg,
 	)
 	engine := router.Setup()
+
+	// 启动 Redis 订阅，转发进度消息到 WebSocket (在所有依赖初始化之后)
+	subscriber := pubsub.NewSubscriber(rdb)
+	go func() {
+		ctx := context.Background()
+		log.Println("Starting Redis subscription...")
+		err := subscriber.Subscribe(ctx, func(msg *pubsub.ProgressMessage) {
+			log.Printf("📨 [Redis] Received progress: user=%d, analysis=%d, job=%d, status=%s, step=%s",
+				msg.UserID, msg.AnalysisID, msg.JobID, msg.Status, msg.Step)
+
+			// 转换消息格式以匹配前端期望
+			msgType := "analysis_progress"
+			if msg.Status == "completed" {
+				msgType = "analysis_completed"
+			} else if msg.Status == "failed" {
+				msgType = "analysis_failed"
+			}
+
+			// 构建前端期望的数据格式
+			data := map[string]interface{}{
+				"job_id":         msg.JobID,
+				"analysis_id":    msg.AnalysisID,
+				"status":         msg.Status,
+				"current_step":   msg.Step,
+				"error_message":  msg.Error,
+			}
+
+			// 如果任务完成，获取 diagram_oss_url
+			if msg.Status == "completed" {
+				if analysis, err := analysisRepo.GetByID(msg.AnalysisID); err == nil && analysis != nil {
+					data["diagram_oss_url"] = analysis.DiagramOSSURL
+				}
+			}
+
+			log.Printf("📤 [WebSocket] Sending to user %d: type=%s", msg.UserID, msgType)
+			wsHub.SendToUser(msg.UserID, &ws.Message{
+				Type: msgType,
+				Data: data,
+			})
+		})
+		if err != nil {
+			log.Printf("❌ Redis subscriber error: %v", err)
+		}
+		log.Println("⚠️ Redis subscriber goroutine exited")
+	}()
+	log.Println("Redis subscriber started")
 
 	// 启动服务器
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)

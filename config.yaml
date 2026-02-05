@@ -4,16 +4,16 @@ server:
   mode: debug
 
 database:
-  host: localhost
+  host: anal_mysql
   port: 3306
   username: root
-  password: password
-  database: go_analyzer
+  password: rootpassword
+  database: anal_go
   max_idle_conns: 10
   max_open_conns: 100
 
 redis:
-  host: localhost
+  host: anal_redis
   port: 6379
   password: ""
   db: 0
@@ -24,11 +24,11 @@ jwt:
   expire_hours: 168
 
 oss:
-  endpoint: oss-cn-hangzhou.aliyuncs.com
-  access_key_id: ""
-  access_key_secret: ""
-  bucket_name: go-analyzer
-  cdn_domain: https://cdn.example.com
+  endpoint: oss-cn-beijing.aliyuncs.com
+  access_key_id: your_aliyun_access_key_id
+  access_key_secret: your_aliyun_access_key_secret
+  bucket_name: your-bucket-name
+  cdn_domain: your-bucket-name.oss-cn-beijing.aliyuncs.com
 
 oauth:
   github:
@@ -80,6 +80,11 @@ subscription:
       price: 49.9
 
 models:
+  - name: glm-4.7
+    display_name: GLM-4.7
+    required_level: free
+    api_provider: zhipu
+    description: 智谱AI基础模型，快速分析（默认）
   - name: gpt-3.5-turbo
     display_name: GPT-3.5 Turbo
     required_level: free

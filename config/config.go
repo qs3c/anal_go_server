@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -121,6 +123,15 @@ type UploadConfig struct {
 }
 
 func Load(configPath string) (*Config, error) {
+	// 优先尝试读取 config.local.yaml（包含真实密钥，不提交到git）
+	dir := filepath.Dir(configPath)
+	localConfigPath := filepath.Join(dir, "config.local.yaml")
+
+	// 检查 config.local.yaml 是否存在
+	if _, err := os.Stat(localConfigPath); err == nil {
+		configPath = localConfigPath
+	}
+
 	viper.SetConfigFile(configPath)
 	viper.SetConfigType("yaml")
 

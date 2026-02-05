@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"github.com/go-redis/redis/v8"
 )
@@ -83,7 +84,16 @@ func (p *Publisher) PublishProgress(ctx context.Context, msg *ProgressMessage) e
 		return fmt.Errorf("failed to marshal progress message: %w", err)
 	}
 
-	return p.client.Publish(ctx, ChannelAnalysisProgress, data).Err()
+	// 发布到 Redis
+	if err := p.client.Publish(ctx, ChannelAnalysisProgress, data).Err(); err != nil {
+		return err
+	}
+
+	// 添加日志
+	log.Printf("📡 [Publisher] Published: user=%d, analysis=%d, job=%d, step=%s, status=%s, progress=%d%%",
+		msg.UserID, msg.AnalysisID, msg.JobID, msg.Step, msg.Status, msg.Progress)
+
+	return nil
 }
 
 // Subscriber Redis 订阅者
