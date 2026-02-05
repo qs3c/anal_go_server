@@ -280,3 +280,37 @@ func (h *AnalysisHandler) GetJobStatus(c *gin.Context) {
 
 	response.Success(c, status)
 }
+
+// GetDiagram 获取图表数据
+// GET /api/v1/analyses/:id/diagram
+func (h *AnalysisHandler) GetDiagram(c *gin.Context) {
+	// 尝试获取用户ID（公开分析可以无需登录访问）
+	userID, _ := middleware.GetUserID(c)
+
+	analysisID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.ParamError(c, "无效的分析ID")
+		return
+	}
+
+	data, err := h.analysisService.GetDiagramData(userID, analysisID)
+	if err != nil {
+		switch err {
+		case service.ErrAnalysisNotFound:
+			response.NotFoundError(c, err.Error())
+		case service.ErrAnalysisPermission:
+			response.PermissionError(c, err.Error())
+		default:
+			// 如果是 OSS 存储，返回提示使用 URL
+			if err.Error() == "diagram stored in OSS, use diagram_oss_url directly" {
+				response.ParamError(c, "请使用 diagram_oss_url 字段获取图表")
+			} else {
+				response.ServerError(c, err.Error())
+			}
+		}
+		return
+	}
+
+	// 直接返回 JSON 数据
+	c.Data(200, "application/json", data)
+}

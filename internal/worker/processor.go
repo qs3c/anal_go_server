@@ -90,10 +90,15 @@ func (p *Processor) Process(ctx context.Context, msg *queue.JobMessage) error {
 
 	if msg.SourceType == "upload" {
 		// Upload mode: use already uploaded files
-		projectPath = filepath.Join(p.cfg.Upload.TempDir, msg.UploadID)
-		if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+		uploadRoot := filepath.Join(p.cfg.Upload.TempDir, msg.UploadID)
+		if _, err := os.Stat(uploadRoot); os.IsNotExist(err) {
 			return handleError(pubsub.StepCloning, fmt.Errorf("上传文件不存在或已过期"))
 		}
+
+		// Find the actual Go project directory (containing go.mod)
+		projectPath = findGoProjectDir(uploadRoot)
+		log.Printf("Job %d: upload root=%s, project dir=%s", job.ID, uploadRoot, projectPath)
+
 		needCleanup = false // uploaded files managed by upload service
 
 		// Skip cloning, go directly to parsing
@@ -173,13 +178,26 @@ func (p *Processor) Process(ctx context.Context, msg *queue.JobMessage) error {
 		return handleError(pubsub.StepUploading, fmt.Errorf("failed to generate visualizer JSON: %w", err))
 	}
 
-	// 上传到 OSS
+	// 上传到 OSS 或保存到本地
 	var diagramURL string
 	if p.ossClient != nil {
 		diagramURL, err = p.ossClient.UploadDiagram(job.AnalysisID, []byte(visualizerJSON))
 		if err != nil {
 			return handleError(pubsub.StepUploading, fmt.Errorf("failed to upload diagram: %w", err))
 		}
+	} else {
+		// 本地存储模式 - 保存到文件
+		localDir := filepath.Join(p.cfg.Upload.TempDir, "diagrams")
+		if err := os.MkdirAll(localDir, 0755); err != nil {
+			return handleError(pubsub.StepUploading, fmt.Errorf("failed to create diagram dir: %w", err))
+		}
+		localPath := filepath.Join(localDir, fmt.Sprintf("%d.json", job.AnalysisID))
+		if err := os.WriteFile(localPath, []byte(visualizerJSON), 0644); err != nil {
+			return handleError(pubsub.StepUploading, fmt.Errorf("failed to save diagram locally: %w", err))
+		}
+		// 使用特殊前缀标记本地存储
+		diagramURL = fmt.Sprintf("local://%d", job.AnalysisID)
+		log.Printf("Job %d: saved diagram locally (OSS not configured)", job.ID)
 	}
 
 	// Step 5: 更新数据库
@@ -224,4 +242,41 @@ func (p *Processor) getModelConfig(modelName string) (provider, apiKey string) {
 	}
 	// 默认返回空，分析器会在没有 LLM 时跳过描述生成
 	return "", ""
+}
+
+// findGoProjectDir finds the directory containing go.mod
+// This handles the case where ZIP extraction creates a subdirectory
+func findGoProjectDir(rootDir string) string {
+	// First check if go.mod exists in the root directory
+	if _, err := os.Stat(filepath.Join(rootDir, "go.mod")); err == nil {
+		return rootDir
+	}
+
+	// Walk the directory tree to find go.mod
+	var goModDir string
+	filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !info.IsDir() && info.Name() == "go.mod" {
+			goModDir = filepath.Dir(path)
+			return filepath.SkipAll // Stop walking after finding the first go.mod
+		}
+		return nil
+	})
+
+	// If found, return the directory containing go.mod
+	if goModDir != "" {
+		return goModDir
+	}
+
+	// Fallback: if no go.mod found, check if there's only one subdirectory
+	// (common case for ZIP files that contain a single project folder)
+	entries, err := os.ReadDir(rootDir)
+	if err == nil && len(entries) == 1 && entries[0].IsDir() {
+		return filepath.Join(rootDir, entries[0].Name())
+	}
+
+	// Default to rootDir if nothing else found
+	return rootDir
 }

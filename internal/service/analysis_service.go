@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -411,6 +415,12 @@ func (s *AnalysisService) GetJobStatus(userID, analysisID int64) (*dto.JobStatus
 }
 
 func (s *AnalysisService) buildAnalysisDetail(a *model.Analysis) *dto.AnalysisDetail {
+	// 处理本地存储的 URL，转换为 API 端点
+	diagramURL := a.DiagramOSSURL
+	if strings.HasPrefix(diagramURL, "local://") {
+		diagramURL = fmt.Sprintf("/api/v1/analyses/%d/diagram", a.ID)
+	}
+
 	detail := &dto.AnalysisDetail{
 		ID:               a.ID,
 		Title:            a.Title,
@@ -420,7 +430,7 @@ func (s *AnalysisService) buildAnalysisDetail(a *model.Analysis) *dto.AnalysisDe
 		StartStruct:      a.StartStruct,
 		AnalysisDepth:    a.AnalysisDepth,
 		ModelName:        a.ModelName,
-		DiagramOSSURL:    a.DiagramOSSURL,
+		DiagramOSSURL:    diagramURL,
 		DiagramSize:      a.DiagramSize,
 		Status:           a.Status,
 		ErrorMessage:     a.ErrorMessage,
@@ -446,4 +456,39 @@ func (s *AnalysisService) buildAnalysisDetail(a *model.Analysis) *dto.AnalysisDe
 	}
 
 	return detail
+}
+
+// GetDiagramData 获取图表数据
+// 支持本地存储和 OSS 存储
+func (s *AnalysisService) GetDiagramData(userID, analysisID int64) ([]byte, error) {
+	analysis, err := s.analysisRepo.GetByID(analysisID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrAnalysisNotFound
+		}
+		return nil, err
+	}
+
+	// 验证权限（私有分析只能自己访问）
+	if !analysis.IsPublic && analysis.UserID != userID {
+		return nil, ErrAnalysisPermission
+	}
+
+	if analysis.DiagramOSSURL == "" {
+		return nil, errors.New("diagram not available")
+	}
+
+	// 检查是否是本地存储
+	if strings.HasPrefix(analysis.DiagramOSSURL, "local://") {
+		// 本地存储：从文件读取
+		localPath := filepath.Join(s.cfg.Upload.TempDir, "diagrams", fmt.Sprintf("%d.json", analysisID))
+		data, err := os.ReadFile(localPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read local diagram: %w", err)
+		}
+		return data, nil
+	}
+
+	// OSS 存储：返回空，前端直接从 URL 获取
+	return nil, errors.New("diagram stored in OSS, use diagram_oss_url directly")
 }

@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -301,11 +302,17 @@ func (s *CommunityService) buildCommunityItem(a *model.Analysis) *dto.CommunityA
 }
 
 func (s *CommunityService) buildCommunityDetail(a *model.Analysis) *dto.CommunityAnalysisDetail {
+	// 处理本地存储的 URL，转换为 API 端点
+	diagramURL := a.DiagramOSSURL
+	if strings.HasPrefix(diagramURL, "local://") {
+		diagramURL = fmt.Sprintf("/api/v1/analyses/%d/diagram", a.ID)
+	}
+
 	detail := &dto.CommunityAnalysisDetail{
 		ID:               a.ID,
 		ShareTitle:       a.ShareTitle,
 		ShareDescription: a.ShareDescription,
-		DiagramOSSURL:    a.DiagramOSSURL,
+		DiagramOSSURL:    diagramURL,
 		CreationType:     a.CreationType,
 		RepoURL:          a.RepoURL,
 		ViewCount:        a.ViewCount,

@@ -99,6 +99,7 @@ func (r *Router) Setup() *gin.Engine {
 				analyses.POST("/:id/share", r.analysisHandler.Share)
 				analyses.DELETE("/:id/share", r.analysisHandler.Unshare)
 				analyses.GET("/:id/job-status", r.analysisHandler.GetJobStatus)
+				analyses.GET("/:id/diagram", r.analysisHandler.GetDiagram)
 			}
 
 			// 上传相关
