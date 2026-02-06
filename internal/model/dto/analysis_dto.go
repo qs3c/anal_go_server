@@ -77,6 +77,7 @@ type AnalysisDetail struct {
 	CompletedAt      string   `json:"completed_at,omitempty"`
 	CreatedAt        string   `json:"created_at"`
 	UpdatedAt        string   `json:"updated_at"`
+	Warnings         []string `json:"warnings,omitempty"`
 }
 
 // CommunityAnalysisItem 社区分析列表项

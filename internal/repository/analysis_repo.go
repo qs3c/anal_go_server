@@ -107,6 +107,13 @@ func (r *AnalysisRepository) ListPublic(page, pageSize int, sortBy string, tags 
 	return analyses, total, nil
 }
 
+// ListLocalDiagrams 查询所有 diagram_oss_url 以 local:// 开头的已完成分析
+func (r *AnalysisRepository) ListLocalDiagrams() ([]*model.Analysis, error) {
+	var analyses []*model.Analysis
+	err := r.db.Where("diagram_oss_url LIKE ? AND status = ?", "local://%", "completed").Find(&analyses).Error
+	return analyses, err
+}
+
 // IncrementViewCount 增加浏览数
 func (r *AnalysisRepository) IncrementViewCount(id int64) error {
 	return r.db.Model(&model.Analysis{}).Where("id = ?", id).

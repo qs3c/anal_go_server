@@ -3,6 +3,8 @@ package oss
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"log"
 	"path"
 	"strings"
 	"time"
@@ -10,6 +12,11 @@ import (
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 
 	"github.com/qs3c/anal_go_server/config"
+)
+
+const (
+	maxRetries    = 3
+	baseRetryWait = 2 * time.Second
 )
 
 type Client struct {
@@ -50,6 +57,24 @@ func (c *Client) UploadDiagram(analysisID int64, data []byte) (string, error) {
 	return c.GetURL(objectKey), nil
 }
 
+// UploadDiagramWithRetry 带重试的上传，最多重试 3 次，指数退避
+func (c *Client) UploadDiagramWithRetry(analysisID int64, data []byte) (string, error) {
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		url, err := c.UploadDiagram(analysisID, data)
+		if err == nil {
+			return url, nil
+		}
+		lastErr = err
+		if attempt < maxRetries {
+			wait := baseRetryWait * (1 << attempt) // 2s, 4s, 8s
+			log.Printf("OSS upload attempt %d failed: %v, retrying in %v", attempt+1, err, wait)
+			time.Sleep(wait)
+		}
+	}
+	return "", fmt.Errorf("OSS upload failed after %d retries: %w", maxRetries+1, lastErr)
+}
+
 // UploadAvatar 上传用户头像
 func (c *Client) UploadAvatar(userID int64, data []byte, ext string) (string, error) {
 	objectKey := fmt.Sprintf("avatars/%d/%d%s", userID, time.Now().Unix(), ext)
@@ -71,6 +96,21 @@ func (c *Client) UploadFile(objectKey string, data []byte, contentType string) (
 	}
 
 	return c.GetURL(objectKey), nil
+}
+
+// Download 下载文件内容
+func (c *Client) Download(objectKey string) ([]byte, error) {
+	body, err := c.bucket.GetObject(objectKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download object: %w", err)
+	}
+	defer body.Close()
+
+	data, err := io.ReadAll(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read object data: %w", err)
+	}
+	return data, nil
 }
 
 // Delete 删除文件
@@ -101,6 +141,9 @@ func (c *Client) GetSignedURL(objectKey string, expireSeconds ...int64) (string,
 	if err != nil {
 		return "", fmt.Errorf("failed to generate signed URL: %w", err)
 	}
+
+	// SDK 默认生成 http:// URL，替换为 https://
+	signedURL = strings.Replace(signedURL, "http://", "https://", 1)
 
 	return signedURL, nil
 }

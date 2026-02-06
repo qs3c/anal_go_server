@@ -301,12 +301,7 @@ func (h *AnalysisHandler) GetDiagram(c *gin.Context) {
 		case service.ErrAnalysisPermission:
 			response.PermissionError(c, err.Error())
 		default:
-			// 如果是 OSS 存储，返回提示使用 URL
-			if err.Error() == "diagram stored in OSS, use diagram_oss_url directly" {
-				response.ParamError(c, "请使用 diagram_oss_url 字段获取图表")
-			} else {
-				response.ServerError(c, err.Error())
-			}
+			response.ServerError(c, err.Error())
 		}
 		return
 	}

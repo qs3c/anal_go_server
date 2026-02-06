@@ -419,17 +419,15 @@ func (s *AnalysisService) buildAnalysisDetail(a *model.Analysis) *dto.AnalysisDe
 	// 处理 diagram URL
 	diagramURL := a.DiagramOSSURL
 
-	// 本地存储：转换为 API 端点
 	if strings.HasPrefix(diagramURL, "local://") {
+		// 本地存储：走 API 代理
 		diagramURL = fmt.Sprintf("/api/v1/analyses/%d/diagram", a.ID)
 	} else if strings.HasPrefix(diagramURL, "https://") && s.ossClient != nil {
-		// OSS 存储：生成带签名的临时 URL（1小时有效）
+		// OSS 存储：生成签名 URL，前端直接从 OSS 下载
 		objectKey := s.ossClient.ExtractObjectKey(diagramURL)
-		signedURL, err := s.ossClient.GetSignedURL(objectKey)
-		if err == nil {
+		if signedURL, err := s.ossClient.GetSignedURL(objectKey); err == nil {
 			diagramURL = signedURL
 		}
-		// 如果生成签名失败，保持原URL（需要 Bucket 设置为公共读）
 	}
 
 	detail := &dto.AnalysisDetail{
@@ -466,6 +464,25 @@ func (s *AnalysisService) buildAnalysisDetail(a *model.Analysis) *dto.AnalysisDe
 		detail.CompletedAt = a.CompletedAt.Format(time.RFC3339)
 	}
 
+	// Check if diagram is stored locally (OSS upload failed)
+	if strings.HasPrefix(a.DiagramOSSURL, "local://") {
+		detail.Warnings = append(detail.Warnings, "图表数据暂存本地，稍后将自动同步到云端")
+	}
+
+	// Check if model had valid LLM config
+	if a.CreationType == "ai" && a.ModelName != "" {
+		hasKey := false
+		for _, m := range s.cfg.Models {
+			if m.Name == a.ModelName && m.APIKey != "" {
+				hasKey = true
+				break
+			}
+		}
+		if !hasKey {
+			detail.Warnings = append(detail.Warnings, "该模型未配置 API Key，分析结果不包含 AI 生成的描述信息")
+		}
+	}
+
 	return detail
 }
 
@@ -500,6 +517,15 @@ func (s *AnalysisService) GetDiagramData(userID, analysisID int64) ([]byte, erro
 		return data, nil
 	}
 
-	// OSS 存储：返回空，前端直接从 URL 获取
-	return nil, errors.New("diagram stored in OSS, use diagram_oss_url directly")
+	// OSS 存储：从 OSS 下载并返回
+	if s.ossClient != nil {
+		objectKey := s.ossClient.ExtractObjectKey(analysis.DiagramOSSURL)
+		data, err := s.ossClient.Download(objectKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to download diagram from OSS: %w", err)
+		}
+		return data, nil
+	}
+
+	return nil, errors.New("OSS client not initialized")
 }

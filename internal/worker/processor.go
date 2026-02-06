@@ -178,25 +178,24 @@ func (p *Processor) Process(ctx context.Context, msg *queue.JobMessage) error {
 		return handleError(pubsub.StepUploading, fmt.Errorf("failed to generate visualizer JSON: %w", err))
 	}
 
-	// 上传到 OSS 或保存到本地
+	// 上传到 OSS（带重试），失败则降级到本地存储
 	var diagramURL string
 	if p.ossClient != nil {
-		diagramURL, err = p.ossClient.UploadDiagram(job.AnalysisID, []byte(visualizerJSON))
+		diagramURL, err = p.ossClient.UploadDiagramWithRetry(job.AnalysisID, []byte(visualizerJSON))
 		if err != nil {
-			return handleError(pubsub.StepUploading, fmt.Errorf("failed to upload diagram: %w", err))
+			// OSS 重试全部失败，降级到本地存储
+			log.Printf("Job %d: OSS upload failed after retries: %v, falling back to local storage", job.ID, err)
+			diagramURL, err = p.saveLocalDiagram(job.AnalysisID, []byte(visualizerJSON))
+			if err != nil {
+				return handleError(pubsub.StepUploading, fmt.Errorf("failed to save diagram locally: %w", err))
+			}
 		}
 	} else {
-		// 本地存储模式 - 保存到文件
-		localDir := filepath.Join(p.cfg.Upload.TempDir, "diagrams")
-		if err := os.MkdirAll(localDir, 0755); err != nil {
-			return handleError(pubsub.StepUploading, fmt.Errorf("failed to create diagram dir: %w", err))
-		}
-		localPath := filepath.Join(localDir, fmt.Sprintf("%d.json", job.AnalysisID))
-		if err := os.WriteFile(localPath, []byte(visualizerJSON), 0644); err != nil {
+		// 无 OSS 客户端，直接本地存储
+		diagramURL, err = p.saveLocalDiagram(job.AnalysisID, []byte(visualizerJSON))
+		if err != nil {
 			return handleError(pubsub.StepUploading, fmt.Errorf("failed to save diagram locally: %w", err))
 		}
-		// 使用特殊前缀标记本地存储
-		diagramURL = fmt.Sprintf("local://%d", job.AnalysisID)
 		log.Printf("Job %d: saved diagram locally (OSS not configured)", job.ID)
 	}
 
@@ -231,6 +230,19 @@ func (p *Processor) Process(ctx context.Context, msg *queue.JobMessage) error {
 		job.ID, job.ElapsedSeconds, result.TotalStructs, result.TotalDeps)
 
 	return nil
+}
+
+// saveLocalDiagram 保存 diagram 到本地文件，返回 local:// URL
+func (p *Processor) saveLocalDiagram(analysisID int64, data []byte) (string, error) {
+	localDir := filepath.Join(p.cfg.Upload.TempDir, "diagrams")
+	if err := os.MkdirAll(localDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create diagram dir: %w", err)
+	}
+	localPath := filepath.Join(localDir, fmt.Sprintf("%d.json", analysisID))
+	if err := os.WriteFile(localPath, data, 0644); err != nil {
+		return "", fmt.Errorf("failed to write diagram file: %w", err)
+	}
+	return fmt.Sprintf("local://%d", analysisID), nil
 }
 
 // getModelConfig 根据模型名获取提供商和 API Key

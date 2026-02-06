@@ -74,6 +74,13 @@ func main() {
 		cancel()
 	}()
 
+	// 启动后台重传器（仅在 OSS 可用时）
+	if ossClient != nil {
+		reuploader := worker.NewReuploader(analysisRepo, ossClient, cfg)
+		go reuploader.Start(ctx)
+		log.Println("Reuploader started")
+	}
+
 	log.Printf("Worker started, max workers: %d", cfg.Queue.MaxWorkers)
 
 	// 启动 worker 循环

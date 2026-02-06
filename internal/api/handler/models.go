@@ -26,6 +26,7 @@ func (h *ModelsHandler) List(c *gin.Context) {
 			"display_name":   m.DisplayName,
 			"required_level": m.RequiredLevel,
 			"description":    m.Description,
+			"available":      m.APIKey != "",
 		}
 	}
 

@@ -58,6 +58,7 @@ services:
       - JWT_SECRET=${JWT_SECRET:-your-secret-key}
     volumes:
       - ./config.docker.yaml:/app/config.yaml:ro
+      - ./config.local.yaml:/app/config.local.yaml:ro
       - upload_data:/tmp/uploads
     depends_on:
       mysql:
@@ -85,6 +86,7 @@ services:
       - REDIS_PORT=6379
     volumes:
       - ./config.docker.yaml:/app/config.yaml:ro
+      - ./config.local.yaml:/app/config.local.yaml:ro
       - upload_data:/tmp/uploads
     depends_on:
       mysql:
