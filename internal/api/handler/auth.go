@@ -8,17 +8,22 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/qs3c/anal_go_server/internal/model/dto"
+	"github.com/qs3c/anal_go_server/internal/pkg/oauth"
 	"github.com/qs3c/anal_go_server/internal/pkg/response"
 	"github.com/qs3c/anal_go_server/internal/service"
 )
 
+const defaultFrontendCallbackURL = "http://47.250.132.14:5173/auth/callback"
+
 type AuthHandler struct {
 	authService *service.AuthService
+	stateStore  *oauth.StateStore
 }
 
-func NewAuthHandler(authService *service.AuthService) *AuthHandler {
+func NewAuthHandler(authService *service.AuthService, stateStore *oauth.StateStore) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
+		stateStore:  stateStore,
 	}
 }
 
@@ -100,10 +105,17 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 // GithubAuth GitHub OAuth 登录
 // GET /api/v1/auth/github
 func (h *AuthHandler) GithubAuth(c *gin.Context) {
-	state := c.Query("state")
-	if state == "" {
-		state = "random_state" // 生产环境应该使用随机值并存储验证
+	redirectURI := c.Query("redirect_uri")
+	if redirectURI == "" {
+		redirectURI = defaultFrontendCallbackURL
 	}
+
+	state, err := h.stateStore.GenerateState(c.Request.Context(), redirectURI)
+	if err != nil {
+		response.ServerError(c, "生成 OAuth 状态失败")
+		return
+	}
+
 	authURL := h.authService.GetGithubAuthURL(state)
 	c.Redirect(http.StatusTemporaryRedirect, authURL)
 }
@@ -117,6 +129,13 @@ func (h *AuthHandler) GithubCallback(c *gin.Context) {
 		return
 	}
 
+	// 从 state 中恢复前端回调地址
+	state := c.Query("state")
+	redirectURI, err := h.stateStore.ValidateState(c.Request.Context(), state)
+	if err != nil || redirectURI == "" {
+		redirectURI = defaultFrontendCallbackURL
+	}
+
 	resp, err := h.authService.GithubCallback(c.Request.Context(), code)
 	if err != nil {
 		response.ServerError(c, "GitHub 登录失败")
@@ -124,10 +143,6 @@ func (h *AuthHandler) GithubCallback(c *gin.Context) {
 	}
 
 	// 重定向到前端，携带 token
-	frontendURL := c.Query("redirect_uri")
-	if frontendURL == "" {
-		frontendURL = "http://localhost:3000"
-	}
-	redirectURL := fmt.Sprintf("%s/auth/callback?token=%s", frontendURL, resp.Token)
+	redirectURL := fmt.Sprintf("%s?token=%s", redirectURI, resp.Token)
 	c.Redirect(http.StatusTemporaryRedirect, redirectURL)
 }

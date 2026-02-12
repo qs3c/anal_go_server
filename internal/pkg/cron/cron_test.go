@@ -42,7 +42,7 @@ func setupCronService(t *testing.T) (*Service, *gorm.DB, func()) {
 
 	userRepo := repository.NewUserRepository(db)
 	quotaService := service.NewQuotaService(userRepo, cfg)
-	cronService := NewService(quotaService)
+	cronService := NewService(quotaService, nil, "", 1)
 
 	cleanup := func() {
 		sqlDB, _ := db.DB()
@@ -57,7 +57,7 @@ func TestNewService(t *testing.T) {
 	defer cleanup()
 
 	// Test with nil quotaService
-	svc := NewService(nil)
+	svc := NewService(nil, nil, "", 1)
 	assert.NotNil(t, svc)
 	assert.Nil(t, svc.quotaService)
 	assert.NotNil(t, svc.stopChan)
@@ -182,7 +182,7 @@ func TestService_Structure(t *testing.T) {
 	userRepo := repository.NewUserRepository(db)
 	quotaService := service.NewQuotaService(userRepo, cfg)
 
-	svc := NewService(quotaService)
+	svc := NewService(quotaService, nil, "", 1)
 
 	assert.Equal(t, quotaService, svc.quotaService)
 	assert.NotNil(t, svc.stopChan)

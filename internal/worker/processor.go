@@ -6,11 +6,13 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/user/go-struct-analyzer/pkg/analyzer"
 
 	"github.com/qs3c/anal_go_server/config"
+	"github.com/qs3c/anal_go_server/internal/model"
 	"github.com/qs3c/anal_go_server/internal/pkg/oss"
 	"github.com/qs3c/anal_go_server/internal/pkg/pubsub"
 	"github.com/qs3c/anal_go_server/internal/pkg/queue"
@@ -117,11 +119,12 @@ func (p *Processor) Process(ctx context.Context, msg *queue.JobMessage) error {
 		publishProgress(pubsub.StepCloning, "processing", "")
 
 		if err := ValidateRepoURL(msg.RepoURL); err != nil {
-			return handleError(pubsub.StepCloning, fmt.Errorf("invalid repo URL: %w", err))
+			return handleError(pubsub.StepCloning, err)
 		}
 
-		if err := CloneRepo(ctx, msg.RepoURL, projectPath); err != nil {
-			return handleError(pubsub.StepCloning, fmt.Errorf("clone failed: %w", err))
+		if err := CloneRepoWithRetry(ctx, msg.RepoURL, projectPath,
+			p.cfg.Clone.TimeoutSeconds, p.cfg.Clone.MaxRetries); err != nil {
+			return handleError(pubsub.StepCloning, err)
 		}
 	}
 
@@ -211,6 +214,12 @@ func (p *Processor) Process(ctx context.Context, msg *queue.JobMessage) error {
 	analysis.Status = "completed"
 	analysis.DiagramOSSURL = diagramURL
 	analysis.DiagramSize = result.TotalStructs // 记录结构体数量
+
+	// 如果描述为空，根据分析结果自动生成
+	if analysis.Description == "" {
+		analysis.Description = generateDescription(analysis, result)
+	}
+
 	if err := p.analysisRepo.Update(analysis); err != nil {
 		return handleError(pubsub.StepDone, fmt.Errorf("failed to update analysis: %w", err))
 	}
@@ -254,6 +263,54 @@ func (p *Processor) getModelConfig(modelName string) (provider, apiKey string) {
 	}
 	// 默认返回空，分析器会在没有 LLM 时跳过描述生成
 	return "", ""
+}
+
+// generateDescription 根据分析结果自动生成描述
+func generateDescription(analysis *model.Analysis, result *analyzer.Result) string {
+	var parts []string
+
+	// 来源信息
+	if analysis.RepoURL != "" {
+		// 提取仓库名
+		repoName := analysis.RepoURL
+		if idx := len(repoName) - 1; idx > 0 {
+			segments := splitRepoURL(repoName)
+			if len(segments) >= 2 {
+				repoName = segments[len(segments)-2] + "/" + segments[len(segments)-1]
+			}
+		}
+		parts = append(parts, fmt.Sprintf("分析仓库 %s", repoName))
+	} else if analysis.SourceType == "upload" {
+		parts = append(parts, "分析上传项目")
+	}
+
+	// 起点结构体
+	if analysis.StartStruct != "" {
+		parts = append(parts, fmt.Sprintf("起点结构体 %s", analysis.StartStruct))
+	}
+
+	// 分析结果统计
+	if result.TotalStructs > 0 {
+		parts = append(parts, fmt.Sprintf("共发现 %d 个结构体、%d 个依赖关系", result.TotalStructs, result.TotalDeps))
+	}
+
+	// 深度
+	if analysis.AnalysisDepth > 0 {
+		parts = append(parts, fmt.Sprintf("深度 %d", analysis.AnalysisDepth))
+	}
+
+	if len(parts) == 0 {
+		return ""
+	}
+
+	return strings.Join(parts, "，")
+}
+
+// splitRepoURL 将仓库 URL 按 / 分割，去掉 .git 后缀
+func splitRepoURL(repoURL string) []string {
+	repoURL = strings.TrimSuffix(repoURL, ".git")
+	repoURL = strings.TrimSuffix(repoURL, "/")
+	return strings.Split(repoURL, "/")
 }
 
 // findGoProjectDir finds the directory containing go.mod

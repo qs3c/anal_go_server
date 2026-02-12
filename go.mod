@@ -3,6 +3,7 @@ module github.com/qs3c/anal_go_server
 go 1.23.0
 
 require (
+	github.com/alicebob/miniredis/v2 v2.36.1
 	github.com/aliyun/aliyun-oss-go-sdk v3.0.2+incompatible
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-redis/redis/v8 v8.11.5
@@ -20,7 +21,6 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/alicebob/miniredis/v2 v2.36.1 // indirect
 	github.com/bytedance/sonic v1.14.0 // indirect
 	github.com/bytedance/sonic/loader v0.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
@@ -73,4 +73,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/user/go-struct-analyzer => /Users/albert/Desktop/fromGithub/anal_go_agent
+replace github.com/user/go-struct-analyzer => /home/admin/fromGithub/anal_go_agent

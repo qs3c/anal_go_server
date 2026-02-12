@@ -5,6 +5,7 @@ import "encoding/json"
 // CreateAnalysisRequest 创建分析请求
 type CreateAnalysisRequest struct {
 	Title         string          `json:"title" binding:"required,max=200"`
+	Description   string          `json:"description,omitempty" binding:"omitempty,max=2000"`
 	CreationType  string          `json:"creation_type" binding:"required,oneof=ai manual"`
 	SourceType    string          `json:"source_type,omitempty"`    // "github" 或 "upload"
 	RepoURL       string          `json:"repo_url,omitempty"`
@@ -40,6 +41,7 @@ type ShareAnalysisRequest struct {
 type AnalysisListItem struct {
 	ID           int64    `json:"id"`
 	Title        string   `json:"title"`
+	Description  string   `json:"description"`
 	CreationType string   `json:"creation_type"`
 	Status       string   `json:"status"`
 	IsPublic     bool     `json:"is_public"`

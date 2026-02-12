@@ -21,6 +21,12 @@ type Config struct {
 	Subscription SubscriptionConfig `mapstructure:"subscription"`
 	Models       []ModelConfig      `mapstructure:"models"`
 	Upload       UploadConfig       `mapstructure:"upload"`
+	Clone        CloneConfig        `mapstructure:"clone"`
+}
+
+type CloneConfig struct {
+	TimeoutSeconds int `mapstructure:"timeout_seconds"`
+	MaxRetries     int `mapstructure:"max_retries"`
 }
 
 type ServerConfig struct {

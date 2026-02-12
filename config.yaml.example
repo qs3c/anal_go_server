@@ -4,7 +4,7 @@ server:
   mode: debug
 
 database:
-  host: anal_mysql
+  host: localhost
   port: 3306
   username: root
   password: rootpassword
@@ -13,7 +13,7 @@ database:
   max_open_conns: 100
 
 redis:
-  host: anal_redis
+  host: localhost
   port: 6379
   password: ""
   db: 0
@@ -84,6 +84,7 @@ models:
     display_name: GLM-4.7
     required_level: free
     api_provider: zhipu
+    api_key: your_zhipu_api_key
     description: 智谱AI基础模型，快速分析（默认）
   - name: gpt-3.5-turbo
     display_name: GPT-3.5 Turbo
@@ -117,3 +118,7 @@ upload:
   expire_hours: 1
   allowed_extensions:
     - .zip
+
+clone:
+  timeout_seconds: 120
+  max_retries: 2

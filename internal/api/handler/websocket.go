@@ -77,25 +77,36 @@ func (h *WebSocketHandler) Handle(c *gin.Context) {
 
 	h.hub.Register(client)
 
+	// 连接关闭时清理
+	defer func() {
+		h.hub.Unregister(client)
+		conn.Close()
+	}()
+
 	// 定时发送 ping 保持连接活跃
+	done := make(chan struct{})
 	go func() {
 		ticker := time.NewTicker(pingPeriod)
 		defer ticker.Stop()
-		for range ticker.C {
-			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second)); err != nil {
+		for {
+			select {
+			case <-done:
 				return
+			case <-ticker.C:
+				if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second)); err != nil {
+					return
+				}
 			}
 		}
 	}()
 
-	// 保持连接，读取消息（主要用于检测断开）
-	go func() {
-		defer h.hub.Unregister(client)
-		for {
-			_, _, err := conn.ReadMessage()
-			if err != nil {
-				break
-			}
+	// 阻塞读取消息，保持 handler 不返回（检测断开）
+	for {
+		_, _, err := conn.ReadMessage()
+		if err != nil {
+			log.Printf("WebSocket read error for user %d: %v", claims.UserID, err)
+			break
 		}
-	}()
+	}
+	close(done)
 }

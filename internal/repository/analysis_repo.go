@@ -114,6 +114,15 @@ func (r *AnalysisRepository) ListLocalDiagrams() ([]*model.Analysis, error) {
 	return analyses, err
 }
 
+// ListOSSMigratedDiagramIDs 查询已迁移到 OSS 的分析 ID 列表（diagram_oss_url 以 https:// 开头）
+func (r *AnalysisRepository) ListOSSMigratedDiagramIDs() ([]int64, error) {
+	var ids []int64
+	err := r.db.Model(&model.Analysis{}).
+		Where("diagram_oss_url LIKE ?", "https://%").
+		Pluck("id", &ids).Error
+	return ids, err
+}
+
 // IncrementViewCount 增加浏览数
 func (r *AnalysisRepository) IncrementViewCount(id int64) error {
 	return r.db.Model(&model.Analysis{}).Where("id = ?", id).

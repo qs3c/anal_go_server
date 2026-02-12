@@ -32,6 +32,7 @@ go.work
 .env.*.local
 
 # Config with secrets
+config.yaml
 config.local.yaml
 
 # OS files

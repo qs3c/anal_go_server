@@ -10,6 +10,7 @@ import (
 	"github.com/qs3c/anal_go_server/internal/api/handler"
 	"github.com/qs3c/anal_go_server/internal/database"
 	"github.com/qs3c/anal_go_server/internal/pkg/cron"
+	"github.com/qs3c/anal_go_server/internal/pkg/oauth"
 	"github.com/qs3c/anal_go_server/internal/pkg/oss"
 	"github.com/qs3c/anal_go_server/internal/pkg/pubsub"
 	"github.com/qs3c/anal_go_server/internal/pkg/queue"
@@ -75,8 +76,11 @@ func main() {
 	communityService := service.NewCommunityService(analysisRepo, interactionRepo, cfg)
 	commentService := service.NewCommentService(commentRepo, analysisRepo, userRepo, cfg)
 
+	// 初始化 OAuth StateStore
+	stateStore := oauth.NewStateStore(rdb)
+
 	// 初始化 Handler
-	authHandler := handler.NewAuthHandler(authService)
+	authHandler := handler.NewAuthHandler(authService, stateStore)
 	userHandler := handler.NewUserHandler(userService)
 	analysisHandler := handler.NewAnalysisHandler(analysisService)
 	modelsHandler := handler.NewModelsHandler(cfg)
@@ -87,7 +91,7 @@ func main() {
 	uploadHandler := handler.NewUploadHandler(uploadService, cfg)
 
 	// 初始化 Cron 服务
-	cronService := cron.NewService(quotaService)
+	cronService := cron.NewService(quotaService, analysisRepo, cfg.Upload.TempDir, cfg.Upload.ExpireHours)
 	cronService.Start()
 	log.Println("Cron service started")
 
